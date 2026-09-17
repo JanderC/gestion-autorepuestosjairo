@@ -1,0 +1,24 @@
+.layout-jairo {
+  display: flex;
+  min-height: 100vh;
+  background: var(--jairo-negro);
+}
+
+.layout-contenido {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* evita overflow horizontal en móvil */
+}
+
+.layout-main {
+  flex: 1;
+  padding: 1.5rem;
+  color: var(--jairo-texto);
+}
+
+@media (max-width: 575.98px) {
+  .layout-main {
+    padding: 1rem 0.75rem;
+  }
+}

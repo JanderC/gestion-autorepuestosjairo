@@ -1,0 +1,41 @@
+/* Paginacion.css */
+.paginacion-jairo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.paginacion-jairo button {
+  min-width: 34px;
+  height: 34px;
+  background: var(--jairo-negro-card);
+  border: 1px solid var(--jairo-gris-borde);
+  border-radius: var(--radio-base);
+  color: var(--jairo-texto-secundario);
+  font-size: 0.85rem;
+  transition: var(--transicion-base);
+}
+
+.paginacion-jairo button:hover:not(:disabled) {
+  border-color: var(--jairo-rojo);
+  color: var(--jairo-texto);
+}
+
+.paginacion-jairo button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.paginacion-activo {
+  background: var(--gradiente-rojo) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+.paginacion-puntos {
+  color: var(--jairo-texto-secundario);
+  padding: 0 0.25rem;
+}

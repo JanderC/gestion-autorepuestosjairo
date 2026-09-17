@@ -1,0 +1,65 @@
+/* ============================================
+   AGREGAR AL FINAL DE App.css
+   Clases nuevas usadas por Dashboard, Caja, Clientes,
+   Usuarios, Reportes y Productos
+   ============================================ */
+.grid-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.saldo-linea {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--jairo-gris-borde);
+  font-size: 0.88rem;
+  color: var(--jairo-texto);
+}
+.saldo-linea:last-child { border-bottom: none; }
+
+.toggle-activo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+}
+.toggle-activo.si { background: rgba(46, 204, 113, 0.15); color: var(--jairo-exito); }
+.toggle-activo.no { background: rgba(168, 168, 168, 0.15); color: var(--jairo-texto-secundario); }
+
+.grafico-contenedor {
+  width: 100%;
+  height: 260px;
+}
+
+.filtro-fechas {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.filtro-fechas input {
+  background: var(--jairo-negro-card);
+  border: 1px solid var(--jairo-gris-borde);
+  border-radius: var(--radio-base);
+  padding: 0.45rem 0.7rem;
+  color: var(--jairo-texto);
+  font-size: 0.85rem;
+}
+
+/* Badges de estado de facturas (por si no lo agregaste todavía) */
+.badge-estado {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.badge-estado-pendiente { background: rgba(241, 196, 15, 0.15); color: var(--jairo-advertencia); }
+.badge-estado-pagada { background: rgba(46, 204, 113, 0.15); color: var(--jairo-exito); }
+.badge-estado-vencida { background: rgba(227, 6, 19, 0.15); color: var(--jairo-rojo); }
+.badge-estado-anulada { background: rgba(168, 168, 168, 0.15); color: var(--jairo-texto-secundario); }

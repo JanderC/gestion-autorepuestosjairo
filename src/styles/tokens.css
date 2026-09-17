@@ -1,0 +1,42 @@
+/* ============================================
+   AUTO REPUESTOS JAIRO — Variables de marca
+   ============================================ */
+:root {
+  /* Colores base del logo */
+  --jairo-negro: #0a0a0a;
+  --jairo-negro-suave: #171717;
+  --jairo-negro-card: #1e1e1e;
+
+  --jairo-rojo: #e30613;
+  --jairo-rojo-oscuro: #a30410;
+  --jairo-rojo-hover: #ff1f2d;
+
+  --jairo-plata: #c9ccd1;
+  --jairo-plata-brillo: #f2f3f5;
+  --jairo-gris-metal: #4a4d52;
+  --jairo-gris-borde: #2c2c2e;
+
+  --jairo-texto: #f5f5f5;
+  --jairo-texto-secundario: #a8a8a8;
+
+  /* Estados */
+  --jairo-exito: #2ecc71;
+  --jairo-advertencia: #f1c40f;
+  --jairo-peligro: var(--jairo-rojo);
+
+  /* Efectos */
+  --gradiente-metal: linear-gradient(135deg, var(--jairo-plata) 0%, var(--jairo-gris-metal) 50%, var(--jairo-plata) 100%);
+  --gradiente-rojo: linear-gradient(135deg, var(--jairo-rojo) 0%, var(--jairo-rojo-oscuro) 100%);
+  --sombra-roja: 0 0 12px rgba(227, 6, 19, 0.4);
+  --sombra-roja-fuerte: 0 0 20px rgba(227, 6, 19, 0.6);
+  --sombra-card: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  /* Tipografía */
+  --fuente-titulos: 'Rajdhani', 'Segoe UI', sans-serif;
+  --fuente-texto: 'Inter', 'Segoe UI', sans-serif;
+
+  /* Radios y espaciados */
+  --radio-base: 8px;
+  --radio-card: 12px;
+  --transicion-base: all 0.2s ease-in-out;
+}

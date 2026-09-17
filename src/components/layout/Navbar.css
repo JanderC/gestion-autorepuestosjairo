@@ -1,0 +1,64 @@
+.navbar-jairo {
+  height: 60px;
+  background: var(--jairo-negro);
+  border-bottom: 1px solid var(--jairo-gris-borde);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+}
+
+.navbar-izquierda,
+.navbar-derecha {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-icono {
+  background: none;
+  border: none;
+  color: var(--jairo-texto);
+  font-size: 1.2rem;
+  padding: 0.4rem;
+  border-radius: var(--radio-base);
+  transition: var(--transicion-base);
+}
+
+.btn-icono:hover {
+  color: var(--jairo-rojo);
+  background: var(--jairo-negro-card);
+}
+
+.btn-hamburguesa {
+  display: block;
+}
+.btn-colapsar {
+  display: none;
+}
+
+.icono-rotado {
+  transform: rotate(180deg);
+  transition: var(--transicion-base);
+}
+
+.navbar-usuario {
+  color: var(--jairo-texto);
+  font-size: 0.9rem;
+}
+.navbar-rol {
+  color: var(--jairo-texto-secundario);
+  text-transform: capitalize;
+}
+
+@media (min-width: 992px) {
+  .btn-hamburguesa {
+    display: none;
+  }
+  .btn-colapsar {
+    display: block;
+  }
+}

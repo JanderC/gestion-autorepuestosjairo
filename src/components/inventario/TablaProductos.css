@@ -1,0 +1,89 @@
+/* TablaProductos.css */
+.tabla-productos-wrapper {
+  overflow-x: auto;
+  background: var(--jairo-negro-suave);
+  border: 1px solid var(--jairo-gris-borde);
+  border-radius: var(--radio-card);
+}
+
+.tabla-productos {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.tabla-productos thead th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  background: var(--jairo-negro-card);
+  color: var(--jairo-texto-secundario);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--jairo-gris-borde);
+}
+
+.tabla-productos tbody td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--jairo-gris-borde);
+  color: var(--jairo-texto);
+  font-size: 0.87rem;
+  vertical-align: middle;
+}
+
+.tabla-productos tbody tr:hover {
+  background: rgba(227, 6, 19, 0.05);
+}
+
+.fila-stock-bajo {
+  background: rgba(227, 6, 19, 0.04);
+}
+
+.celda-codigo {
+  color: var(--jairo-texto-secundario);
+  font-family: monospace;
+}
+
+.miniatura-producto {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--jairo-gris-borde);
+}
+
+.miniatura-placeholder {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  background: var(--jairo-negro-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--jairo-texto-secundario);
+}
+
+.celda-acciones {
+  display: flex;
+  gap: 0.6rem;
+  white-space: nowrap;
+}
+.celda-acciones button {
+  background: none;
+  border: none;
+  color: var(--jairo-texto-secundario);
+  font-size: 0.95rem;
+  transition: var(--transicion-base);
+}
+.celda-acciones button:hover {
+  color: var(--jairo-rojo);
+}
+
+.tabla-vacia {
+  text-align: center;
+  padding: 2.5rem;
+  color: var(--jairo-texto-secundario);
+  background: var(--jairo-negro-suave);
+  border: 1px dashed var(--jairo-gris-borde);
+  border-radius: var(--radio-card);
+}

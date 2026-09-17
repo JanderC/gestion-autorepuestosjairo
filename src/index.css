@@ -1,0 +1,42 @@
+@import "./styles/tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--fuente-texto);
+  background-color: var(--jairo-negro);
+  color: var(--jairo-texto);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--fuente-titulos);
+  margin: 0;
+}
+
+/* Evita que Chrome pinte los inputs de celeste al autocompletar (login, formularios) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--jairo-texto);
+  -webkit-box-shadow: 0 0 0px 1000px var(--jairo-negro-card) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}

@@ -1,0 +1,229 @@
+.login-pagina {
+  min-height: 100vh;
+  display: flex;
+  background: var(--jairo-negro);
+}
+
+/* ============================
+   Panel de marca (izquierda)
+   ============================ */
+.login-panel-marca {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--jairo-negro-suave) 0px,
+      var(--jairo-negro-suave) 40px,
+      var(--jairo-negro) 40px,
+      var(--jairo-negro) 80px
+    );
+  border-right: 1px solid var(--jairo-gris-borde);
+}
+
+.login-marca-brillo {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(227, 6, 19, 0.35) 0%, transparent 70%);
+  filter: blur(20px);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.login-marca-contenido {
+  position: relative;
+  text-align: center;
+  padding: 2rem;
+  z-index: 1;
+}
+
+.login-marca-logo {
+  max-width: 340px;
+  width: 80%;
+  height: auto;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.6));
+  margin-bottom: 1.5rem;
+}
+
+.login-marca-frase {
+  color: var(--jairo-plata);
+  font-family: var(--fuente-titulos);
+  font-size: 1.15rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+/* ============================
+   Panel de formulario (derecha)
+   ============================ */
+.login-panel-formulario {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  max-width: 520px;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-logo-movil {
+  display: none;
+  max-width: 200px;
+  margin: 0 auto 1rem;
+}
+
+.login-titulo {
+  color: var(--jairo-texto);
+  font-family: var(--fuente-titulos);
+  font-size: 1.9rem;
+  font-weight: 700;
+  margin-bottom: 0.15rem;
+}
+
+.login-subtitulo {
+  color: var(--jairo-texto-secundario);
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.login-campo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--jairo-negro-card);
+  border: 1px solid var(--jairo-gris-borde);
+  border-radius: var(--radio-base);
+  padding: 0.8rem 1rem;
+  transition: var(--transicion-base);
+}
+
+.login-campo:focus-within {
+  border-color: var(--jairo-rojo);
+  box-shadow: var(--sombra-roja);
+}
+
+.login-icono-campo {
+  color: var(--jairo-texto-secundario);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.login-campo input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--jairo-texto);
+  font-size: 0.95rem;
+}
+
+.login-campo input::placeholder {
+  color: var(--jairo-texto-secundario);
+}
+
+.login-toggle-clave {
+  background: none;
+  border: none;
+  color: var(--jairo-texto-secundario);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.login-toggle-clave:hover {
+  color: var(--jairo-rojo);
+}
+
+.login-recordarme {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--jairo-texto-secundario);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+.login-recordarme input {
+  accent-color: var(--jairo-rojo);
+  width: 15px;
+  height: 15px;
+}
+
+.login-boton {
+  margin-top: 0.5rem;
+  padding: 0.85rem;
+  border: none;
+  border-radius: var(--radio-base);
+  background: var(--gradiente-rojo);
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: var(--transicion-base);
+}
+
+.login-boton:hover:not(:disabled) {
+  box-shadow: var(--sombra-roja-fuerte);
+  transform: translateY(-1px);
+}
+
+.login-boton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.login-spinner {
+  animation: girar 0.8s linear infinite;
+}
+
+@keyframes girar {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.login-pie {
+  text-align: center;
+  color: var(--jairo-texto-secundario);
+  font-size: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* ============================
+   Responsivo: mobile solo formulario
+   ============================ */
+@media (max-width: 900px) {
+  .login-panel-marca {
+    display: none;
+  }
+  .login-panel-formulario {
+    max-width: 100%;
+    padding: 2rem 1.25rem;
+  }
+  .login-logo-movil {
+    display: block;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-titulo {
+    font-size: 1.6rem;
+  }
+}

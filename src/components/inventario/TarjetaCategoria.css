@@ -1,0 +1,73 @@
+/* TarjetaCategoria.css */
+.tarjeta-categoria {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: var(--jairo-negro-suave);
+  border: 1px solid var(--jairo-gris-borde);
+  border-radius: var(--radio-card);
+  padding: 1.1rem;
+  text-align: left;
+  transition: var(--transicion-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.tarjeta-categoria::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--gradiente-metal);
+  opacity: 0.6;
+  transition: var(--transicion-base);
+}
+
+.tarjeta-categoria:hover {
+  border-color: var(--jairo-rojo);
+  box-shadow: var(--sombra-roja);
+  transform: translateY(-2px);
+}
+.tarjeta-categoria:hover::before {
+  background: var(--gradiente-rojo);
+  opacity: 1;
+}
+
+.tarjeta-categoria-icono {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  background: var(--jairo-negro-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--jairo-plata);
+}
+
+.tarjeta-categoria-info h3 {
+  color: var(--jairo-texto);
+  font-family: var(--fuente-titulos);
+  font-size: 1.05rem;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tarjeta-categoria-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--jairo-texto-secundario);
+  font-size: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.tarjeta-categoria-capital {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
