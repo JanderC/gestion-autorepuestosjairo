@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "react-toastify";
+import { FaSearch } from "react-icons/fa";
 import { obtenerVentaDevolvible, crearDevolucion } from "../../api/devoluciones.api";
+import { buscarClientes } from "../../api/clientes.api";
 import { formatearMoneda } from "../../utils/formatoMoneda";
 
 const MONEDAS = ["USD", "COP", "BS"];
@@ -14,6 +16,11 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
   const [metodoPagoId, setMetodoPagoId] = useState("");
   const [motivo, setMotivo] = useState("");
   const [guardando, setGuardando] = useState(false);
+
+  // Solo se usa cuando la venta original NO tenía cliente y se elige "credito"
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [resultadosCliente, setResultadosCliente] = useState([]);
+  const [clienteCredito, setClienteCredito] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -33,10 +40,24 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
 
   const items = datos?.items || [];
   const hayFiado = !!datos?.fiado && Number(datos.fiado.saldo_pendiente_original) > 0;
+  const ventaTieneCliente = !!datos?.venta.cliente_id;
 
   const cambiarCantidad = (productoId, disponible, valor) => {
     const cantidad = Math.max(0, Math.min(disponible, Number(valor) || 0));
     setCantidades((prev) => ({ ...prev, [productoId]: cantidad }));
+  };
+
+  const buscarCliente = async (q) => {
+    setBusquedaCliente(q);
+    if (q.trim().length < 2) {
+      setResultadosCliente([]);
+      return;
+    }
+    try {
+      setResultadosCliente(await buscarClientes(q));
+    } catch {
+      setResultadosCliente([]);
+    }
   };
 
   const itemsSeleccionados = useMemo(
@@ -61,6 +82,10 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
       toast.error("Indicá con qué método se le devolvió el dinero");
       return;
     }
+    if (tipoReembolso === "credito" && !ventaTieneCliente && !clienteCredito) {
+      toast.error("Elegí a qué cliente guardarle el saldo a favor");
+      return;
+    }
 
     setGuardando(true);
     try {
@@ -70,6 +95,7 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
         tipo_reembolso: tipoReembolso,
         moneda_reembolso: tipoReembolso !== "ninguno" ? monedaReembolso : null,
         metodo_pago_id: tipoReembolso === "efectivo" ? Number(metodoPagoId) : null,
+        cliente_id: tipoReembolso === "credito" && !ventaTieneCliente ? clienteCredito?.id : undefined,
         motivo: motivo || null,
       });
       toast.success("Devolución registrada");
@@ -150,7 +176,48 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
                 Reducir fiado
               </button>
             )}
+            <button type="button" className={tipoReembolso === "credito" ? "activo" : ""} onClick={() => setTipoReembolso("credito")}>
+              Saldo a favor
+            </button>
           </div>
+
+          {tipoReembolso === "credito" && !ventaTieneCliente && (
+            <div className="mt-1">
+              {clienteCredito ? (
+                <div className="item-seleccionable" style={{ cursor: "default" }}>
+                  <div className="item-seleccionable-info">
+                    <div className="item-seleccionable-nombre">{clienteCredito.nombre}</div>
+                    <div className="item-seleccionable-meta">{clienteCredito.telefono || "Sin teléfono"}</div>
+                  </div>
+                  <button type="button" className="btn-secundario" onClick={() => setClienteCredito(null)}>Cambiar</button>
+                </div>
+              ) : (
+                <>
+                  <div className="buscador">
+                    <FaSearch />
+                    <input placeholder="Buscar cliente por nombre o teléfono..." value={busquedaCliente} onChange={(e) => buscarCliente(e.target.value)} />
+                  </div>
+                  {resultadosCliente.length > 0 && (
+                    <div className="lista-seleccionable mt-1">
+                      {resultadosCliente.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="item-seleccionable"
+                          onClick={() => { setClienteCredito(c); setResultadosCliente([]); setBusquedaCliente(""); }}
+                        >
+                          <div className="item-seleccionable-info">
+                            <div className="item-seleccionable-nombre">{c.nombre}</div>
+                            <div className="item-seleccionable-meta">{c.telefono || "Sin teléfono"}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {tipoReembolso !== "ninguno" && (
             <div className="formulario-fila mt-1">
@@ -178,8 +245,11 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
             </p>
           )}
           {tipoReembolso === "fiado" && (
+            <p className="pagina-subtitulo mt-1">Esto reduce directamente la deuda pendiente del cliente, sin mover efectivo.</p>
+          )}
+          {tipoReembolso === "credito" && (
             <p className="pagina-subtitulo mt-1">
-              Esto reduce directamente la deuda pendiente del cliente, sin mover efectivo.
+              Queda anotado como saldo a favor del cliente — no mueve la caja. Se lo podés descontar la próxima vez que compre.
             </p>
           )}
 

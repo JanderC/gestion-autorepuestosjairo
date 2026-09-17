@@ -1,31 +1,30 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
-import { FaSearch, FaPlus, FaFileInvoice } from "react-icons/fa";
+import { FaSearch, FaPlus, FaFileInvoice, FaExchangeAlt } from "react-icons/fa";
 import { listarClientes, buscarClientes, obtenerEstadoCuenta } from "../api/clientes.api";
 import { listarMetodosPago } from "../api/metodosPago.api";
-import { obtenerSesionAbierta } from "../api/caja.api";
 import ClienteFormModal from "../components/clientes/ClienteFormModal";
 import AbonoModal from "../components/clientes/AbonoModal";
 import EstadoCuentaModal from "../components/clientes/EstadoCuentaModal";
+import CuentaCorrienteModal from "../components/clientes/CuentaCorrienteModal";
 
 export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [metodosPago, setMetodosPago] = useState([]);
-  const [sesionCaja, setSesionCaja] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
 
   const [modalNuevo, setModalNuevo] = useState(false);
   const [estadoCuenta, setEstadoCuenta] = useState(null);
   const [modalAbono, setModalAbono] = useState(null);
+  const [clienteCuentaCorriente, setClienteCuentaCorriente] = useState(null);
 
   const cargarClientes = async () => {
     setCargando(true);
     try {
-      const [lista, metodos, sesion] = await Promise.all([listarClientes(), listarMetodosPago(), obtenerSesionAbierta()]);
+      const [lista, metodos] = await Promise.all([listarClientes(), listarMetodosPago()]);
       setClientes(lista);
       setMetodosPago(metodos);
-      setSesionCaja(sesion);
     } catch {
       toast.error("No se pudieron cargar los clientes");
     } finally {
@@ -93,6 +92,9 @@ export default function Clientes() {
                   <button title="Ver estado de cuenta" onClick={() => verEstadoCuenta(c)}>
                     <FaFileInvoice />
                   </button>
+                  <button title="Cuenta corriente / consignación" onClick={() => setClienteCuentaCorriente(c)}>
+                    <FaExchangeAlt />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -116,13 +118,16 @@ export default function Clientes() {
         <AbonoModal
           cliente={modalAbono}
           metodosPago={metodosPago}
-          sesionCajaId={sesionCaja?.id}
           onGuardado={async () => {
             setEstadoCuenta(await obtenerEstadoCuenta(modalAbono.id));
             setModalAbono(null);
           }}
           onCerrar={() => setModalAbono(null)}
         />
+      )}
+
+      {clienteCuentaCorriente && (
+        <CuentaCorrienteModal cliente={clienteCuentaCorriente} onCerrar={() => setClienteCuentaCorriente(null)} />
       )}
     </div>
   );

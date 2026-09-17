@@ -5,7 +5,7 @@ import { FaSearch, FaShoppingCart, FaUserPlus, FaPlus, FaMinus, FaCashRegister, 
 import { obtenerProductos } from "../api/productos.api";
 import { obtenerTasaActual } from "../api/tasas.api";
 import { listarMetodosPago } from "../api/metodosPago.api";
-import { buscarClientes } from "../api/clientes.api";
+import { buscarClientes, obtenerEstadoCuenta } from "../api/clientes.api";
 import { crearVenta, obtenerVentaPorId } from "../api/ventas.api";
 import { obtenerSesionAbierta, obtenerMovimientosDelDia } from "../api/caja.api";
 import { precioListaEnMoneda, convertirAUSD, convertirDesdeUSD } from "../utils/monedaHelpers";
@@ -48,6 +48,8 @@ export default function PuntoDeVenta() {
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [resultadosCliente, setResultadosCliente] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+  const [estadoCuentaCliente, setEstadoCuentaCliente] = useState(null);
+  const [creditoAplicado, setCreditoAplicado] = useState("");
 
   const [busquedaVentas, setBusquedaVentas] = useState("");
   const [paginaVentas, setPaginaVentas] = useState(1);
@@ -180,31 +182,42 @@ export default function PuntoDeVenta() {
   const totalFinalMonedaVenta = tasa ? convertirDesdeUSD(totalFinalUSD, monedaVenta, tasa) : 0;
   const ajusteMonedaVenta = tasa ? convertirDesdeUSD(ajusteUSD, monedaVenta, tasa) : 0;
 
+  // Saldo a favor disponible del cliente seleccionado, en la moneda en la que se está vendiendo
+  const creditoDisponibleEnMonedaVenta = useMemo(() => {
+    const fila = estadoCuentaCliente?.saldos_pendientes.find((s) => s.moneda === monedaVenta);
+    const saldo = fila ? Number(fila.saldo_pendiente) : 0;
+    return saldo < 0 ? Math.abs(saldo) : 0;
+  }, [estadoCuentaCliente, monedaVenta]);
+
+  const creditoAplicadoUSD = tasa && creditoAplicado ? convertirAUSD(Number(creditoAplicado), monedaVenta, tasa) : 0;
+
   const totalPagadoUSD = tasa
-    ? pagos.reduce((acc, p) => acc + (p.monto ? convertirAUSD(Number(p.monto), p.moneda, tasa) : 0), 0)
+    ? pagos.reduce((acc, p) => acc + (p.monto ? convertirAUSD(Number(p.monto), p.moneda, tasa) : 0), 0) + creditoAplicadoUSD
     : 0;
 
+  // No se redondea en USD antes de convertir: redondear centavos de dólar y después multiplicar
+  // por la tasa (ej. x4000 en COP) amplifica el error hasta decenas en la moneda final.
   const restanteUSD = totalFinalUSD - totalPagadoUSD;
   const hayFaltante = restanteUSD > 0.01;
   const hayVuelto = restanteUSD < -0.01;
   const restanteMonedaVenta = tasa ? redondear2(convertirDesdeUSD(Math.abs(restanteUSD), monedaVenta, tasa)) : 0;
 
+  // Mientras haya una sola línea de pago sin tocar, se autocompleta al total MENOS el
+  // saldo a favor que se esté aplicando — así el efectivo solo cubre lo que realmente falta.
   useEffect(() => {
     if (modoFiado) return;
     setPagos((prev) => {
       if (prev.length !== 1 || !prev[0].autoCalculado) return prev;
-      const nuevoMonto = totalFinalMonedaVenta > 0 ? totalFinalMonedaVenta.toFixed(2) : "";
+      const objetivo = Math.max(0, totalFinalMonedaVenta - (Number(creditoAplicado) || 0));
+      const nuevoMonto = objetivo > 0 ? objetivo.toFixed(2) : "";
       if (prev[0].monto === nuevoMonto && prev[0].moneda === monedaVenta) return prev;
       return [{ ...prev[0], moneda: monedaVenta, monto: nuevoMonto }];
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalFinalMonedaVenta, monedaVenta, modoFiado]);
+  }, [totalFinalMonedaVenta, monedaVenta, modoFiado, creditoAplicado]);
 
   const activarPagoCompleto = () => {
     setModoFiado(false);
-    setClienteSeleccionado(null);
-    setResultadosCliente([]);
-    setBusquedaCliente("");
     setPagos([
       {
         id: contadorPagoId++,
@@ -224,7 +237,7 @@ export default function PuntoDeVenta() {
   const agregarLineaPago = () => {
     const pagosCongelados = pagos.map((p) => ({ ...p, autoCalculado: false }));
     const totalPagadoUSDActual = tasa
-      ? pagosCongelados.reduce((acc, p) => acc + (p.monto ? convertirAUSD(Number(p.monto), p.moneda, tasa) : 0), 0)
+      ? pagosCongelados.reduce((acc, p) => acc + (p.monto ? convertirAUSD(Number(p.monto), p.moneda, tasa) : 0), 0) + creditoAplicadoUSD
       : 0;
     const restanteUSDActual = Math.max(0, totalFinalUSD - totalPagadoUSDActual);
     const montoSugerido = tasa ? redondear2(convertirDesdeUSD(restanteUSDActual, monedaVenta, tasa)) : 0;
@@ -260,6 +273,23 @@ export default function PuntoDeVenta() {
     }
   };
 
+  const seleccionarCliente = async (c) => {
+    setClienteSeleccionado(c);
+    setResultadosCliente([]);
+    setBusquedaCliente("");
+    try {
+      setEstadoCuentaCliente(await obtenerEstadoCuenta(c.id));
+    } catch {
+      setEstadoCuentaCliente(null);
+    }
+  };
+
+  const quitarCliente = () => {
+    setClienteSeleccionado(null);
+    setEstadoCuentaCliente(null);
+    setCreditoAplicado("");
+  };
+
   const confirmarVenta = async () => {
     if (carrito.length === 0) {
       toast.error("Agregá al menos un producto");
@@ -287,8 +317,9 @@ export default function PuntoDeVenta() {
       pagos: pagos
         .filter((p) => p.metodo_pago_id && p.monto && Number(p.monto) > 0)
         .map((p) => ({ metodo_pago_id: Number(p.metodo_pago_id), moneda: p.moneda, monto: Number(p.monto) })),
-      cliente_id: modoFiado ? clienteSeleccionado?.id || null : null,
+      cliente_id: clienteSeleccionado?.id || null,
       moneda_venta: monedaVenta,
+      aplicar_credito: creditoAplicado ? Number(creditoAplicado) : undefined,
     };
 
     setProcesando(true);
@@ -296,9 +327,7 @@ export default function PuntoDeVenta() {
       const resultado = await crearVenta(payload);
       setVentaRegistrada(resultado);
       setCarrito([]);
-      setClienteSeleccionado(null);
-      setResultadosCliente([]);
-      setBusquedaCliente("");
+      quitarCliente();
       setModoFiado(false);
       setPagos(
         metodoEfectivo
@@ -555,7 +584,7 @@ export default function PuntoDeVenta() {
             <button className={modoFiado ? "activo" : ""} onClick={activarFiado}>Fiar venta</button>
           </div>
 
-          {!modoFiado ? (
+          {!modoFiado && (
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {pagos.map((p) => (
@@ -566,84 +595,122 @@ export default function PuntoDeVenta() {
                 <FaPlus /> Agregar otra forma de pago
               </button>
             </>
-          ) : (
-            <div className="formulario">
-              <div className="panel-header" style={{ marginBottom: "0.5rem" }}>
-                <span className="panel-titulo"><FaUserPlus /> Cliente</span>
-              </div>
+          )}
 
-              {clienteSeleccionado ? (
+          {/* Cliente: siempre visible — sirve para aplicar saldo a favor en cualquier venta,
+              y es obligatorio cuando se está fiando. */}
+          <div className="formulario mt-2">
+            <div className="panel-header" style={{ marginBottom: "0.5rem" }}>
+              <span className="panel-titulo">
+                <FaUserPlus /> Cliente {!modoFiado && "(opcional — para usar saldo a favor)"}
+              </span>
+            </div>
+
+            {clienteSeleccionado ? (
+              <>
                 <div className="item-seleccionable" style={{ cursor: "default" }}>
                   <div className="item-seleccionable-info">
                     <div className="item-seleccionable-nombre">{clienteSeleccionado.nombre}</div>
                     <div className="item-seleccionable-meta">{clienteSeleccionado.telefono || "Sin teléfono"}</div>
                   </div>
-                  <button className="btn-secundario" onClick={() => setClienteSeleccionado(null)}>Cambiar</button>
+                  <button className="btn-secundario" onClick={quitarCliente}>Quitar</button>
                 </div>
-              ) : (
-                <>
-                  <div className="buscador">
-                    <FaSearch />
-                    <input placeholder="Buscar cliente por nombre o teléfono..." value={busquedaCliente} onChange={(e) => buscarCliente(e.target.value)} autoFocus />
-                  </div>
-                  {resultadosCliente.length > 0 && (
-                    <div className="lista-seleccionable mt-1">
-                      {resultadosCliente.map((c) => (
-                        <button
-                          key={c.id}
-                          className="item-seleccionable"
-                          onClick={() => {
-                            setClienteSeleccionado(c);
-                            setResultadosCliente([]);
-                            setBusquedaCliente("");
-                          }}
-                        >
-                          <div className="item-seleccionable-info">
-                            <div className="item-seleccionable-nombre">{c.nombre}</div>
-                            <div className="item-seleccionable-meta">{c.telefono || "Sin teléfono"}</div>
-                          </div>
-                        </button>
-                      ))}
+
+                {creditoDisponibleEnMonedaVenta > 0 && (
+                  <div className="mt-1">
+                    <p className="carrito-resumen-linea ajuste-descuento">
+                      <span>Saldo a favor disponible ({monedaVenta})</span>
+                      <span>{formatearMoneda(creditoDisponibleEnMonedaVenta, monedaVenta)}</span>
+                    </p>
+                    <div className="formulario-fila">
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="input-jairo"
+                        placeholder="Aplicar del saldo a favor"
+                        value={creditoAplicado}
+                        onChange={(e) => {
+                          const tope = Math.min(creditoDisponibleEnMonedaVenta, totalFinalMonedaVenta);
+                          setCreditoAplicado(Math.max(0, Math.min(Number(e.target.value) || 0, tope)).toString());
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-secundario"
+                        onClick={() => setCreditoAplicado(Math.min(creditoDisponibleEnMonedaVenta, totalFinalMonedaVenta).toString())}
+                      >
+                        Usar todo
+                      </button>
                     </div>
-                  )}
-                </>
-              )}
+                  </div>
+                )}
 
-              <label className="mt-2">Abona ahora (opcional — dejalo vacío si fía todo)</label>
-              <div className="formulario-fila">
-                <div className="formulario-campo" style={{ flex: "0 0 90px" }}>
-                  <select value={abono?.moneda || monedaVenta} onChange={(e) => actualizarPago(abono.id, { ...abono, moneda: e.target.value })}>
-                    {MONEDAS.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div className="formulario-campo">
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Monto del abono"
-                    value={abono?.monto || ""}
-                    onChange={(e) => actualizarPago(abono.id, { ...abono, monto: e.target.value })}
-                  />
-                </div>
-              </div>
+                {modoFiado && (
+                  <>
+                    <label className="mt-2">Abona ahora (opcional — dejalo vacío si fía todo)</label>
+                    <div className="formulario-fila">
+                      <div className="formulario-campo" style={{ flex: "0 0 90px" }}>
+                        <select value={abono?.moneda || monedaVenta} onChange={(e) => actualizarPago(abono.id, { ...abono, moneda: e.target.value })}>
+                          {MONEDAS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                      </div>
+                      <div className="formulario-campo">
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Monto del abono"
+                          value={abono?.monto || ""}
+                          onChange={(e) => actualizarPago(abono.id, { ...abono, monto: e.target.value })}
+                        />
+                      </div>
+                    </div>
 
-              {Number(abono?.monto) > 0 && (
-                <div className="formulario-campo">
-                  <label>Método del abono</label>
-                  <select value={abono?.metodo_pago_id || ""} onChange={(e) => actualizarPago(abono.id, { ...abono, metodo_pago_id: e.target.value })}>
-                    <option value="">Seleccionar...</option>
-                    {metodosPagoDirectos.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-                  </select>
+                    {Number(abono?.monto) > 0 && (
+                      <div className="formulario-campo">
+                        <label>Método del abono</label>
+                        <select value={abono?.metodo_pago_id || ""} onChange={(e) => actualizarPago(abono.id, { ...abono, metodo_pago_id: e.target.value })}>
+                          <option value="">Seleccionar...</option>
+                          {metodosPagoDirectos.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="buscador">
+                  <FaSearch />
+                  <input placeholder="Buscar cliente por nombre o teléfono..." value={busquedaCliente} onChange={(e) => buscarCliente(e.target.value)} />
                 </div>
-              )}
-            </div>
-          )}
+                {resultadosCliente.length > 0 && (
+                  <div className="lista-seleccionable mt-1">
+                    {resultadosCliente.map((c) => (
+                      <button key={c.id} className="item-seleccionable" onClick={() => seleccionarCliente(c)}>
+                        <div className="item-seleccionable-info">
+                          <div className="item-seleccionable-nombre">{c.nombre}</div>
+                          <div className="item-seleccionable-meta">{c.telefono || "Sin teléfono"}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           <div className="carrito-resumen mt-2">
             <div className="carrito-resumen-total">
               <span>Cuenta a pagar</span>
               <span>{formatearMoneda(totalFinalMonedaVenta, monedaVenta)}</span>
             </div>
+
+            {creditoAplicado && Number(creditoAplicado) > 0 && (
+              <div className="carrito-resumen-linea ajuste-descuento">
+                <span>Saldo a favor aplicado</span>
+                <span>{formatearMoneda(Number(creditoAplicado), monedaVenta)}</span>
+              </div>
+            )}
 
             {!modoFiado && hayFaltante && (
               <div className="carrito-resumen-linea ajuste-recargo">
