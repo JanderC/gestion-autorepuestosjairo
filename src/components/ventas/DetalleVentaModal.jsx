@@ -1,6 +1,6 @@
 import { formatearMoneda } from "../../utils/formatoMoneda";
 
-export default function DetalleVentaModal({ venta, onCerrar }) {
+export default function DetalleVentaModal({ venta, onCerrar, onDevolver }) {
   const { venta: v, detalles, pagos, cliente, fiado } = venta;
 
   return (
@@ -52,6 +52,9 @@ export default function DetalleVentaModal({ venta, onCerrar }) {
 
         <div className="modal-acciones">
           <button className="btn-secundario" onClick={onCerrar}>Cerrar</button>
+          {onDevolver && v.estado !== "anulada" && (
+            <button className="btn-primario" onClick={onDevolver}>Registrar devolución</button>
+          )}
         </div>
       </div>
     </div>

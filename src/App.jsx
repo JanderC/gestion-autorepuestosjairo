@@ -18,6 +18,7 @@ import Facturas from "./pages/Facturas";
 import Usuarios from "./pages/Usuarios";
 import Colaboraciones from "./pages/Colaboraciones";
 import Configuracion from "./pages/Configuracion";
+import Devoluciones from "./pages/Devoluciones";
 import Fiados from "./pages/Fiados";
 
 // Protege una ruta: exige sesión y, opcionalmente, uno o varios roles permitidos
@@ -119,11 +120,23 @@ function AppRoutes() {
             </RutaProtegida>
           }
         />
-        <Route path="fiados" element={
-          <RutaProtegida rolesPermitidos={["admin"]}>
-            <Fiados />
-          </RutaProtegida>
-        } />
+        <Route
+          path="fiados"
+          element={
+            <RutaProtegida rolesPermitidos={["admin"]}>
+              <Fiados />
+            </RutaProtegida>
+          }
+        />
+        <Route
+          path="devoluciones"
+          element={
+            <RutaProtegida rolesPermitidos={["admin"]}>
+              {" "}
+              <Devoluciones />{" "}
+            </RutaProtegida>
+          }
+        />
       </Route>
 
       {/* Cualquier ruta no encontrada */}
@@ -134,7 +147,9 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <AuthProvider>
         <AppRoutes />
         <ToastContainer position="top-right" autoClose={3000} theme="dark" />

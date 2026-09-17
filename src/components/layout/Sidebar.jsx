@@ -13,6 +13,7 @@ import {
   FaCog,
   FaTimes,
   FaHandHoldingUsd,
+  FaUndo 
 } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import "./Sidebar.css";
@@ -30,6 +31,7 @@ const MODULOS = [
   { path: "/facturas", label: "Facturas", icon: FaFileInvoiceDollar, roles: ["admin"] },
   { path: "/usuarios", label: "Usuarios", icon: FaUserShield, roles: ["admin"] },
   { path: "/colaboraciones", label: "Colaboraciones", icon: FaGift, roles: ["admin"] },
+  { path: "/devoluciones", label: "Devoluciones", icon: FaUndo, roles: ["admin", "cajero"] },
   { path: "/configuracion", label: "Configuración", icon: FaCog, roles: ["admin"] },
   { path: "/fiados", label: "Fiados", icon: FaHandHoldingUsd, roles: ["admin", "cajero"] },
 ];

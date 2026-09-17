@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FaSearch, FaShoppingCart, FaUserPlus, FaPlus, FaMinus, FaCashRegister, FaLock } from "react-icons/fa";
+import { FaSearch, FaShoppingCart, FaUserPlus, FaPlus, FaMinus, FaCashRegister, FaLock, FaUndo } from "react-icons/fa";
 import { obtenerProductos } from "../api/productos.api";
 import { obtenerTasaActual } from "../api/tasas.api";
 import { listarMetodosPago } from "../api/metodosPago.api";
@@ -17,6 +17,8 @@ import DetalleVentaModal from "../components/ventas/DetalleVentaModal";
 import VentaRegistradaModal from "../components/ventas/VentaRegistradaModal";
 import MovimientoCajaModal from "../components/caja/MovimientoCajaModal";
 import CerrarCajaModal from "../components/caja/CerrarCajaModal";
+import BuscarVentaDevolucionModal from "../components/devoluciones/BuscarVentaDevolucionModal";
+import DevolucionFormModal from "../components/devoluciones/DevolucionFormModal";
 import Paginacion from "../components/comunes/Paginacion";
 
 const MONEDAS = ["USD", "COP", "BS"];
@@ -52,6 +54,9 @@ export default function PuntoDeVenta() {
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
   const [modalMovimiento, setModalMovimiento] = useState(null);
   const [modalCerrarCaja, setModalCerrarCaja] = useState(false);
+
+  const [modalBuscarDevolucion, setModalBuscarDevolucion] = useState(false);
+  const [ventaDevolucionId, setVentaDevolucionId] = useState(null);
 
   const [procesando, setProcesando] = useState(false);
   const [ventaRegistrada, setVentaRegistrada] = useState(null);
@@ -179,8 +184,6 @@ export default function PuntoDeVenta() {
     ? pagos.reduce((acc, p) => acc + (p.monto ? convertirAUSD(Number(p.monto), p.moneda, tasa) : 0), 0)
     : 0;
 
-  // No se redondea en USD antes de convertir: redondear centavos de dólar y después multiplicar
-  // por la tasa (ej. x4000 en COP) amplifica el error hasta decenas en la moneda final.
   const restanteUSD = totalFinalUSD - totalPagadoUSD;
   const hayFaltante = restanteUSD > 0.01;
   const hayVuelto = restanteUSD < -0.01;
@@ -318,8 +321,6 @@ export default function PuntoDeVenta() {
     }
   };
 
-  // Solo lo del turno abierto: al cerrar la caja, este feed queda vacío y todo el
-  // historial pasa a consultarse desde Caja → Historial de cierres.
   const feedItems = useMemo(() => {
     if (!sesionCaja) return [];
     return movimientosSesion;
@@ -442,12 +443,14 @@ export default function PuntoDeVenta() {
                 <div className="pagina-acciones">
                   <button className="btn-secundario" onClick={() => setModalMovimiento("egreso")}><FaMinus /> Egreso</button>
                   <button className="btn-secundario" onClick={() => setModalMovimiento("ingreso")}><FaPlus /> Ingreso</button>
+                  <button className="btn-secundario" onClick={() => setModalBuscarDevolucion(true)}><FaUndo /> Devolución</button>
                   <button className="btn-primario" onClick={() => setModalCerrarCaja(true)}><FaLock /> Cerrar caja</button>
                 </div>
               ) : (
-                <button className="btn-secundario" onClick={() => navigate("/caja")}>
-                  <FaCashRegister /> Abrir caja
-                </button>
+                <div className="pagina-acciones">
+                  <button className="btn-secundario" onClick={() => setModalBuscarDevolucion(true)}><FaUndo /> Devolución</button>
+                  <button className="btn-secundario" onClick={() => navigate("/caja")}><FaCashRegister /> Abrir caja</button>
+                </div>
               )}
             </div>
 
@@ -672,7 +675,16 @@ export default function PuntoDeVenta() {
         </div>
       </div>
 
-      {ventaSeleccionada && <DetalleVentaModal venta={ventaSeleccionada} onCerrar={() => setVentaSeleccionada(null)} />}
+      {ventaSeleccionada && (
+        <DetalleVentaModal
+          venta={ventaSeleccionada}
+          onCerrar={() => setVentaSeleccionada(null)}
+          onDevolver={() => {
+            setVentaDevolucionId(ventaSeleccionada.venta.id);
+            setVentaSeleccionada(null);
+          }}
+        />
+      )}
       {ventaRegistrada && <VentaRegistradaModal resultado={ventaRegistrada} onCerrar={() => setVentaRegistrada(null)} />}
 
       {modalMovimiento && sesionCaja && (
@@ -689,6 +701,22 @@ export default function PuntoDeVenta() {
           sesion={sesionCaja}
           onGuardado={() => { setModalCerrarCaja(false); cargarDatos(); }}
           onCerrar={() => setModalCerrarCaja(false)}
+        />
+      )}
+
+      {modalBuscarDevolucion && (
+        <BuscarVentaDevolucionModal
+          onSeleccionar={(ventaId) => { setVentaDevolucionId(ventaId); setModalBuscarDevolucion(false); }}
+          onCerrar={() => setModalBuscarDevolucion(false)}
+        />
+      )}
+
+      {ventaDevolucionId && (
+        <DevolucionFormModal
+          ventaId={ventaDevolucionId}
+          metodosPago={metodosPagoDirectos}
+          onGuardado={() => { setVentaDevolucionId(null); cargarDatos(); }}
+          onCerrar={() => setVentaDevolucionId(null)}
         />
       )}
     </div>
