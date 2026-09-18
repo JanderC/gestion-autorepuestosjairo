@@ -1,16 +1,22 @@
 import { FaWarehouse, FaBoxes } from "react-icons/fa";
 import { formatearMoneda } from "../../utils/formatoMoneda";
+import { convertirAUSD, convertirDesdeUSD } from "../../utils/monedaHelpers";
 import "./TarjetaCategoria.css";
 
-export default function TarjetaCategoria({ categoria, productos, onAbrir }) {
+const MONEDAS = ["USD", "COP", "BS"];
+
+export default function TarjetaCategoria({ categoria, productos, tasa, onAbrir }) {
   const cantidad = productos.length;
   const stockTotal = productos.reduce((acc, p) => acc + Number(p.stock || 0), 0);
 
-  const capitalPorMoneda = productos.reduce((acc, p) => {
-    const capital = Number(p.precio_compra || 0) * Number(p.stock || 0);
-    acc[p.moneda_base] = (acc[p.moneda_base] || 0) + capital;
-    return acc;
-  }, {});
+  // Mismo criterio que el resumen general: se convierte todo a USD, se suma, y ese total
+  // se muestra en las 3 monedas — no una suma separada por cada moneda base distinta.
+  const capitalUSD = tasa
+    ? productos.reduce(
+        (acc, p) => acc + convertirAUSD(Number(p.precio_compra) || 0, p.moneda_base, tasa) * Number(p.stock || 0),
+        0
+      )
+    : 0;
 
   return (
     <button className="tarjeta-categoria" onClick={onAbrir}>
@@ -25,11 +31,12 @@ export default function TarjetaCategoria({ categoria, productos, onAbrir }) {
         </p>
 
         <div className="tarjeta-categoria-capital">
-          {Object.entries(capitalPorMoneda).map(([moneda, valor]) => (
-            <span key={moneda} className={`chip-moneda chip-${moneda.toLowerCase()}`}>
-              {formatearMoneda(valor, moneda)}
-            </span>
-          ))}
+          {tasa &&
+            MONEDAS.map((m) => (
+              <span key={m} className={`chip-moneda chip-${m.toLowerCase()}`}>
+                {formatearMoneda(convertirDesdeUSD(capitalUSD, m, tasa), m)}
+              </span>
+            ))}
         </div>
       </div>
     </button>

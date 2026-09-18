@@ -7,7 +7,9 @@ import {
   ajustarStock as ajustarStockApi,
   desactivarProducto as desactivarProductoApi,
 } from "../api/productos.api";
+import { obtenerTasaActual } from "../api/tasas.api";
 import { formatearMoneda } from "../utils/formatoMoneda";
+import { convertirAUSD, convertirDesdeUSD } from "../utils/monedaHelpers";
 import TarjetaCategoria from "../components/inventario/TarjetaCategoria";
 import TablaProductos from "../components/inventario/TablaProductos";
 import ProductoFormModal from "../components/inventario/ProductoFormModal";
@@ -16,10 +18,12 @@ import Paginacion from "../components/comunes/Paginacion";
 import "./Inventario.css";
 
 const POR_PAGINA = 10;
+const MONEDAS = ["USD", "COP", "BS"];
 
 export default function Inventario() {
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [tasa, setTasa] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
@@ -35,12 +39,14 @@ export default function Inventario() {
     setCargando(true);
     setError(null);
     try {
-      const [listaProductos, listaCategorias] = await Promise.all([
+      const [listaProductos, listaCategorias, tasaActual] = await Promise.all([
         obtenerProductos(),
         obtenerCategorias(),
+        obtenerTasaActual(),
       ]);
       setProductos(listaProductos);
       setCategorias(listaCategorias);
+      setTasa(tasaActual);
     } catch (err) {
       setError("No se pudo cargar el inventario");
     } finally {
@@ -54,15 +60,24 @@ export default function Inventario() {
 
   const totalProductos = productos.length;
 
-  const capitalPorMoneda = useMemo(
-    () =>
-      productos.reduce((acc, p) => {
-        const capital = Number(p.precio_compra || 0) * Number(p.stock || 0);
-        acc[p.moneda_base] = (acc[p.moneda_base] || 0) + capital;
-        return acc;
-      }, {}),
-    [productos]
-  );
+  // Capital invertido: cada producto se convierte a USD (sin importar en qué moneda esté
+  // cargado), se suma todo, y ese único total se muestra convertido a las 3 monedas —
+  // así "cuánto capital hay invertido" es el MISMO número real, visto en 3 formatos, y no
+  // tres sumas distintas según en qué moneda cargaron cada producto.
+  const capitalTotalUSD = useMemo(() => {
+    if (!tasa) return 0;
+    return productos.reduce(
+      (acc, p) => acc + convertirAUSD(Number(p.precio_compra) || 0, p.moneda_base, tasa) * Number(p.stock || 0),
+      0
+    );
+  }, [productos, tasa]);
+
+  const capitalPorMoneda = useMemo(() => {
+    if (!tasa) return { USD: 0, COP: 0, BS: 0 };
+    const resultado = {};
+    MONEDAS.forEach((m) => { resultado[m] = convertirDesdeUSD(capitalTotalUSD, m, tasa); });
+    return resultado;
+  }, [capitalTotalUSD, tasa]);
 
   const productosPorCategoria = useMemo(
     () =>
@@ -146,7 +161,7 @@ export default function Inventario() {
           </div>
         </div>
 
-        {["USD", "COP", "VES"].map((moneda) => (
+        {MONEDAS.map((moneda) => (
           <div key={moneda} className={`tarjeta-resumen tarjeta-resumen-${moneda.toLowerCase()}`}>
             <div>
               <span className="tarjeta-resumen-valor">
@@ -165,10 +180,16 @@ export default function Inventario() {
           </button>
         ) : (
           <div className="selector-vista">
-            <button className={vista === "categorias" ? "activo" : ""} onClick={() => setVista("categorias")}>
+            <button
+              className={vista === "categorias" ? "activo" : ""}
+              onClick={() => setVista("categorias")}
+            >
               <FaLayerGroup /> Por pasillo
             </button>
-            <button className={vista === "general" ? "activo" : ""} onClick={() => setVista("general")}>
+            <button
+              className={vista === "general" ? "activo" : ""}
+              onClick={() => setVista("general")}
+            >
               <FaThLarge /> Vista general
             </button>
           </div>
@@ -206,6 +227,7 @@ export default function Inventario() {
               key={cat}
               categoria={cat === "Sin categoría" ? null : cat}
               productos={productosPorCategoria[cat]}
+              tasa={tasa}
               onAbrir={() => abrirCategoria(cat)}
             />
           ))}
