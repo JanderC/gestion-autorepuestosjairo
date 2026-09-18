@@ -10,7 +10,7 @@ export default function TarjetaCategoria({ categoria, productos, tasa, onAbrir }
   const stockTotal = productos.reduce((acc, p) => acc + Number(p.stock || 0), 0);
 
   // Mismo criterio que el resumen general: se convierte todo a USD, se suma, y ese total
-  // se muestra en las 3 monedas — no una suma separada por cada moneda base distinta.
+  // se muestra en las 3 monedas — no una suma separada por cada moneda base distinta.ss
   const capitalUSD = tasa
     ? productos.reduce(
         (acc, p) => acc + convertirAUSD(Number(p.precio_compra) || 0, p.moneda_base, tasa) * Number(p.stock || 0),
