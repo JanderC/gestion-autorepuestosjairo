@@ -1,19 +1,32 @@
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "react-toastify";
-import { FaSearch } from "react-icons/fa";
+import { FaSearch, FaTimes } from "react-icons/fa";
 import { obtenerVentaDevolvible, crearDevolucion } from "../../api/devoluciones.api";
+import { obtenerProductos } from "../../api/productos.api";
+import { obtenerTasaActual } from "../../api/tasas.api";
 import { buscarClientes } from "../../api/clientes.api";
+import { precioListaEnMoneda, convertirEntreMonedas } from "../../utils/monedaHelpers";
 import { formatearMoneda } from "../../utils/formatoMoneda";
 
 const MONEDAS = ["USD", "COP", "BS"];
 
+function redondear2(n) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
 export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, onCerrar }) {
   const [datos, setDatos] = useState(null);
+  const [productos, setProductos] = useState([]);
+  const [tasa, setTasa] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [cantidades, setCantidades] = useState({});
+
+  const [esCambio, setEsCambio] = useState(false);
+  const [busquedaProductoCambio, setBusquedaProductoCambio] = useState("");
+  const [itemsCambio, setItemsCambio] = useState([]); // [{ producto, cantidad }]
+
   const [tipoReembolso, setTipoReembolso] = useState("ninguno");
   const [monedaReembolso, setMonedaReembolso] = useState("USD");
-  const [direccionEfectivo, setDireccionEfectivo] = useState("egreso");
   const [montoManual, setMontoManual] = useState("");
   const [montoTocado, setMontoTocado] = useState(false);
   const [metodoPagoId, setMetodoPagoId] = useState("");
@@ -22,13 +35,19 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
 
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [resultadosCliente, setResultadosCliente] = useState([]);
-  const [clienteCredito, setClienteCredito] = useState(null);
+  const [clienteElegido, setClienteElegido] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await obtenerVentaDevolvible(ventaId);
+        const [data, listaProductos, tasaActual] = await Promise.all([
+          obtenerVentaDevolvible(ventaId),
+          obtenerProductos(),
+          obtenerTasaActual(),
+        ]);
         setDatos(data);
+        setProductos(listaProductos);
+        setTasa(tasaActual);
         if (data.venta.vuelto_moneda) setMonedaReembolso(data.venta.vuelto_moneda);
       } catch (error) {
         toast.error(error.response?.data?.message || "No se pudo cargar la venta");
@@ -49,6 +68,59 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
     setCantidades((prev) => ({ ...prev, [productoId]: cantidad }));
   };
 
+  const itemsSeleccionados = useMemo(
+    () => items.filter((i) => (cantidades[i.producto_id] || 0) > 0),
+    [items, cantidades]
+  );
+
+  const montoEstimado = useMemo(
+    () => itemsSeleccionados.reduce((acc, i) => acc + Number(i.precio_unitario_original) * cantidades[i.producto_id], 0),
+    [itemsSeleccionados, cantidades]
+  );
+
+  const monedaOriginal = items[0]?.moneda_original;
+
+  // --- Producto de cambio ---
+  const productosFiltradosCambio = useMemo(() => {
+    if (!busquedaProductoCambio.trim()) return [];
+    const q = busquedaProductoCambio.toLowerCase();
+    return productos
+      .filter((p) => (p.nombre.toLowerCase().includes(q) || p.codigo.toLowerCase().includes(q)) && !itemsCambio.some((i) => i.producto.id === p.id))
+      .slice(0, 6);
+  }, [busquedaProductoCambio, productos, itemsCambio]);
+
+  const agregarItemCambio = (producto) => {
+    setItemsCambio((prev) => [...prev, { producto, cantidad: 1 }]);
+    setBusquedaProductoCambio("");
+  };
+  const cambiarCantidadCambio = (productoId, valor) => {
+    setItemsCambio((prev) =>
+      prev.map((i) => (i.producto.id === productoId ? { ...i, cantidad: Math.max(1, Math.min(i.producto.stock, Number(valor) || 1)) } : i))
+    );
+  };
+  const quitarItemCambio = (productoId) => setItemsCambio((prev) => prev.filter((i) => i.producto.id !== productoId));
+
+  const valorCambioEnLiquidacion = useMemo(() => {
+    if (!tasa) return 0;
+    return itemsCambio.reduce((acc, i) => acc + precioListaEnMoneda(i.producto, monedaReembolso, tasa) * i.cantidad, 0);
+  }, [itemsCambio, tasa, monedaReembolso]);
+
+  const valorDevueltoEnLiquidacion = useMemo(() => {
+    if (!tasa || !monedaOriginal) return montoEstimado;
+    return convertirEntreMonedas(montoEstimado, monedaOriginal, monedaReembolso, tasa);
+  }, [montoEstimado, monedaOriginal, monedaReembolso, tasa]);
+
+  // Diferencia "de base": positiva = se le debe al cliente; negativa = el cliente debe pagar
+  const diferenciaBase = redondear2(valorDevueltoEnLiquidacion - valorCambioEnLiquidacion);
+
+  // El monto se autocompleta con la diferencia calculada, pero se puede ajustar a mano
+  useEffect(() => {
+    if (!montoTocado) setMontoManual(Math.abs(diferenciaBase) > 0.01 ? Math.abs(diferenciaBase).toFixed(2) : "");
+  }, [diferenciaBase, montoTocado]);
+
+  const necesitaClienteManual =
+    !ventaTieneCliente && (tipoReembolso === "credito" || (tipoReembolso === "fiado" && diferenciaBase < 0));
+
   const buscarCliente = async (q) => {
     setBusquedaCliente(q);
     if (q.trim().length < 2) {
@@ -62,24 +134,6 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
     }
   };
 
-  const itemsSeleccionados = useMemo(
-    () => items.filter((i) => (cantidades[i.producto_id] || 0) > 0),
-    [items, cantidades]
-  );
-
-  const montoEstimado = useMemo(
-    () => itemsSeleccionados.reduce((acc, i) => acc + Number(i.precio_unitario_original) * cantidades[i.producto_id], 0),
-    [itemsSeleccionados, cantidades]
-  );
-
-  const monedaOriginal = items[0]?.moneda_original;
-
-  // El monto se autocompleta con lo calculado desde los productos elegidos, pero se puede
-  // ajustar a mano — por ejemplo cuando es un cambio y la diferencia no coincide exacto.
-  useEffect(() => {
-    if (!montoTocado) setMontoManual(montoEstimado > 0 ? montoEstimado.toFixed(2) : "");
-  }, [montoEstimado, montoTocado]);
-
   const manejarSubmit = async (e) => {
     e.preventDefault();
     if (itemsSeleccionados.length === 0) {
@@ -90,25 +144,34 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
       toast.error("Indicá con qué método se movió el dinero");
       return;
     }
-    if (tipoReembolso === "credito" && !ventaTieneCliente && !clienteCredito) {
-      toast.error("Elegí a qué cliente guardarle el saldo a favor");
+    if (necesitaClienteManual && !clienteElegido) {
+      toast.error(tipoReembolso === "credito" ? "Elegí a qué cliente guardarle el saldo a favor" : "Elegí a qué cliente se le fía la diferencia");
       return;
     }
 
     setGuardando(true);
     try {
-      await crearDevolucion({
+      const resultado = await crearDevolucion({
         venta_id: ventaId,
         items: itemsSeleccionados.map((i) => ({ producto_id: i.producto_id, cantidad: cantidades[i.producto_id] })),
+        items_cambio: esCambio && itemsCambio.length > 0 ? itemsCambio.map((i) => ({ producto_id: i.producto.id, cantidad: i.cantidad })) : undefined,
         tipo_reembolso: tipoReembolso,
-        moneda_reembolso: tipoReembolso !== "ninguno" ? monedaReembolso : null,
-        monto_manual: tipoReembolso !== "ninguno" ? montoManual : undefined,
-        direccion_efectivo: tipoReembolso === "efectivo" ? direccionEfectivo : undefined,
+        moneda_reembolso: monedaReembolso,
+        monto_manual: montoManual !== "" ? montoManual : undefined,
         metodo_pago_id: tipoReembolso === "efectivo" ? Number(metodoPagoId) : null,
-        cliente_id: tipoReembolso === "credito" && !ventaTieneCliente ? clienteCredito?.id : undefined,
+        cliente_id: necesitaClienteManual ? clienteElegido?.id : undefined,
         motivo: motivo || null,
       });
-      toast.success("Devolución registrada");
+
+      if (Math.abs(resultado.diferencia) > 0.01) {
+        toast.success(
+          resultado.diferencia > 0
+            ? `Devolución registrada — a favor del cliente ${formatearMoneda(resultado.diferencia, resultado.moneda_liquidacion)}`
+            : `Devolución registrada — el cliente pagó ${formatearMoneda(Math.abs(resultado.diferencia), resultado.moneda_liquidacion)}`
+        );
+      } else {
+        toast.success("Devolución registrada");
+      }
       onGuardado();
     } catch (error) {
       toast.error(error.response?.data?.message || "No se pudo registrar la devolución");
@@ -164,16 +227,94 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
             </table>
           </div>
 
+          <label className="mt-2" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <input type="checkbox" checked={esCambio} onChange={(e) => setEsCambio(e.target.checked)} />
+            Es un cambio — el cliente se lleva otro producto
+          </label>
+
+          {esCambio && (
+            <div className="panel mt-1">
+              <div className="panel-header"><span className="panel-titulo">Producto que se lleva a cambio</span></div>
+              <div className="buscador">
+                <FaSearch />
+                <input placeholder="Buscar por nombre o código..." value={busquedaProductoCambio} onChange={(e) => setBusquedaProductoCambio(e.target.value)} />
+              </div>
+              {busquedaProductoCambio.trim() && (
+                <div className="lista-seleccionable mt-1">
+                  {productosFiltradosCambio.length === 0 && <div className="estado-vacio">Sin resultados</div>}
+                  {productosFiltradosCambio.map((p) => (
+                    <button key={p.id} type="button" className="item-seleccionable" onClick={() => agregarItemCambio(p)} disabled={p.stock <= 0}>
+                      <div className="item-seleccionable-info">
+                        <div className="item-seleccionable-nombre">{p.nombre}</div>
+                        <div className="item-seleccionable-meta">{p.codigo} · Stock: {p.stock}</div>
+                      </div>
+                      <span className="item-seleccionable-precio">
+                        {tasa && formatearMoneda(precioListaEnMoneda(p, monedaReembolso, tasa), monedaReembolso)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {itemsCambio.length > 0 && (
+                <div className="tabla-datos-wrapper mt-1">
+                  <table className="tabla-datos">
+                    <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio</th><th></th></tr></thead>
+                    <tbody>
+                      {itemsCambio.map((i) => (
+                        <tr key={i.producto.id}>
+                          <td>{i.producto.nombre}</td>
+                          <td>
+                            <input
+                              type="number"
+                              min="1"
+                              max={i.producto.stock}
+                              className="input-jairo"
+                              style={{ width: "70px" }}
+                              value={i.cantidad}
+                              onChange={(e) => cambiarCantidadCambio(i.producto.id, e.target.value)}
+                            />
+                          </td>
+                          <td>{tasa && formatearMoneda(precioListaEnMoneda(i.producto, monedaReembolso, tasa) * i.cantidad, monedaReembolso)}</td>
+                          <td><button type="button" className="btn-peligro" onClick={() => quitarItemCambio(i.producto.id)}><FaTimes /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {itemsSeleccionados.length > 0 && (
             <div className="carrito-resumen mt-1">
-              <div className="carrito-resumen-total">
-                <span>Valor de lista de lo elegido</span>
+              <div className="carrito-resumen-linea">
+                <span>Valor devuelto</span>
                 <span>{formatearMoneda(montoEstimado, monedaOriginal)}</span>
+              </div>
+              {esCambio && itemsCambio.length > 0 && (
+                <div className="carrito-resumen-linea">
+                  <span>Valor entregado a cambio</span>
+                  <span>{formatearMoneda(valorCambioEnLiquidacion, monedaReembolso)}</span>
+                </div>
+              )}
+              <div className={`carrito-resumen-total ${diferenciaBase < 0 ? "ajuste-recargo" : "ajuste-descuento"}`}>
+                <span>{diferenciaBase >= 0 ? "A favor del cliente" : "El cliente debe pagar"}</span>
+                <span>{formatearMoneda(Math.abs(diferenciaBase), monedaReembolso)}</span>
               </div>
             </div>
           )}
 
-          <label className="mt-2">¿Qué pasa con el dinero?</label>
+          <div className="formulario-fila mt-2">
+            <div className="formulario-campo" style={{ flex: "0 0 90px" }}>
+              <label>Moneda</label>
+              <select value={monedaReembolso} onChange={(e) => setMonedaReembolso(e.target.value)}>
+                {MONEDAS.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <label className="mt-1">¿Qué pasa con la diferencia?</label>
           <div className="selector-pill">
             <button type="button" className={tipoReembolso === "ninguno" ? "activo" : ""} onClick={() => setTipoReembolso("ninguno")}>
               Solo cambio
@@ -181,25 +322,27 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
             <button type="button" className={tipoReembolso === "efectivo" ? "activo" : ""} onClick={() => setTipoReembolso("efectivo")}>
               Mover efectivo
             </button>
-            {hayFiado && (
+            {(hayFiado || diferenciaBase < 0) && (
               <button type="button" className={tipoReembolso === "fiado" ? "activo" : ""} onClick={() => setTipoReembolso("fiado")}>
-                Reducir fiado
+                {diferenciaBase < 0 ? "Fiar la diferencia" : "Reducir fiado"}
               </button>
             )}
-            <button type="button" className={tipoReembolso === "credito" ? "activo" : ""} onClick={() => setTipoReembolso("credito")}>
-              Saldo a favor
-            </button>
+            {diferenciaBase >= 0 && (
+              <button type="button" className={tipoReembolso === "credito" ? "activo" : ""} onClick={() => setTipoReembolso("credito")}>
+                Saldo a favor
+              </button>
+            )}
           </div>
 
-          {tipoReembolso === "credito" && !ventaTieneCliente && (
+          {necesitaClienteManual && (
             <div className="mt-1">
-              {clienteCredito ? (
+              {clienteElegido ? (
                 <div className="item-seleccionable" style={{ cursor: "default" }}>
                   <div className="item-seleccionable-info">
-                    <div className="item-seleccionable-nombre">{clienteCredito.nombre}</div>
-                    <div className="item-seleccionable-meta">{clienteCredito.telefono || "Sin teléfono"}</div>
+                    <div className="item-seleccionable-nombre">{clienteElegido.nombre}</div>
+                    <div className="item-seleccionable-meta">{clienteElegido.telefono || "Sin teléfono"}</div>
                   </div>
-                  <button type="button" className="btn-secundario" onClick={() => setClienteCredito(null)}>Cambiar</button>
+                  <button type="button" className="btn-secundario" onClick={() => setClienteElegido(null)}>Cambiar</button>
                 </div>
               ) : (
                 <>
@@ -214,7 +357,7 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
                           key={c.id}
                           type="button"
                           className="item-seleccionable"
-                          onClick={() => { setClienteCredito(c); setResultadosCliente([]); setBusquedaCliente(""); }}
+                          onClick={() => { setClienteElegido(c); setResultadosCliente([]); setBusquedaCliente(""); }}
                         >
                           <div className="item-seleccionable-info">
                             <div className="item-seleccionable-nombre">{c.nombre}</div>
@@ -229,33 +372,16 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
             </div>
           )}
 
-          {tipoReembolso === "efectivo" && (
-            <div className="selector-pill mt-1">
-              <button type="button" className={direccionEfectivo === "egreso" ? "activo" : ""} onClick={() => setDireccionEfectivo("egreso")}>
-                Devolvemos plata (sale de caja)
-              </button>
-              <button type="button" className={direccionEfectivo === "ingreso" ? "activo" : ""} onClick={() => setDireccionEfectivo("ingreso")}>
-                Cliente paga diferencia (entra a caja)
-              </button>
-            </div>
-          )}
-
           {tipoReembolso !== "ninguno" && (
             <div className="formulario-fila mt-1">
               <div className="formulario-campo">
-                <label>Monto a mover</label>
+                <label>Monto de la diferencia ({monedaReembolso})</label>
                 <input
                   type="number"
                   step="0.01"
                   value={montoManual}
                   onChange={(e) => { setMontoTocado(true); setMontoManual(e.target.value); }}
                 />
-              </div>
-              <div className="formulario-campo" style={{ flex: "0 0 90px" }}>
-                <label>Moneda</label>
-                <select value={monedaReembolso} onChange={(e) => setMonedaReembolso(e.target.value)}>
-                  {MONEDAS.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
               </div>
               {tipoReembolso === "efectivo" && (
                 <div className="formulario-campo">
@@ -271,13 +397,16 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
 
           {tipoReembolso === "efectivo" && (
             <p className="pagina-subtitulo mt-1">
-              {direccionEfectivo === "egreso"
-                ? "Se registra como egreso del turno actual — resta del cuadre de caja."
-                : "Se registra como ingreso del turno actual — suma al cuadre de caja."}
+              {diferenciaBase >= 0
+                ? "Sale de caja como egreso — se refleja en Punto de Venta y resta del cuadre."
+                : "Entra a caja como ingreso — se refleja en Punto de Venta y suma al cuadre."}
             </p>
           )}
-          {tipoReembolso === "fiado" && (
-            <p className="pagina-subtitulo mt-1">Esto reduce directamente la deuda pendiente del cliente, sin mover efectivo.</p>
+          {tipoReembolso === "fiado" && diferenciaBase < 0 && (
+            <p className="pagina-subtitulo mt-1">El cliente queda debiendo esta diferencia, sin mover efectivo.</p>
+          )}
+          {tipoReembolso === "fiado" && diferenciaBase >= 0 && (
+            <p className="pagina-subtitulo mt-1">Se reduce la deuda pendiente del cliente, sin mover efectivo.</p>
           )}
           {tipoReembolso === "credito" && (
             <p className="pagina-subtitulo mt-1">
