@@ -19,6 +19,7 @@ import MovimientoCajaModal from "../components/caja/MovimientoCajaModal";
 import CerrarCajaModal from "../components/caja/CerrarCajaModal";
 import BuscarVentaDevolucionModal from "../components/devoluciones/BuscarVentaDevolucionModal";
 import DevolucionFormModal from "../components/devoluciones/DevolucionFormModal";
+import ClienteFormModal from "../components/clientes/ClienteFormModal";
 import Paginacion from "../components/comunes/Paginacion";
 
 const MONEDAS = ["USD", "COP", "BS"];
@@ -50,7 +51,7 @@ export default function PuntoDeVenta() {
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [estadoCuentaCliente, setEstadoCuentaCliente] = useState(null);
   const [creditoAplicado, setCreditoAplicado] = useState("");
-
+const [modalNuevoCliente, setModalNuevoCliente] = useState(false);
   const [busquedaVentas, setBusquedaVentas] = useState("");
   const [paginaVentas, setPaginaVentas] = useState(1);
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null);
@@ -695,6 +696,10 @@ export default function PuntoDeVenta() {
                     ))}
                   </div>
                 )}
+
+                <button type="button" className="btn-secundario mt-1" onClick={() => setModalNuevoCliente(true)}>
+                  <FaUserPlus /> Crear cliente nuevo
+                </button>
               </>
             )}
           </div>
@@ -786,6 +791,16 @@ export default function PuntoDeVenta() {
           onCerrar={() => setVentaDevolucionId(null)}
         />
       )}
+
+      {modalNuevoCliente && (
+  <ClienteFormModal
+    onGuardado={(clienteCreado) => {
+      setModalNuevoCliente(false);
+      if (clienteCreado) seleccionarCliente(clienteCreado);
+    }}
+    onCerrar={() => setModalNuevoCliente(false)}
+  />
+)}
     </div>
   );
 }

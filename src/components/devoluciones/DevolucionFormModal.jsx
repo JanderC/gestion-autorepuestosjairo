@@ -13,11 +13,13 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
   const [cantidades, setCantidades] = useState({});
   const [tipoReembolso, setTipoReembolso] = useState("ninguno");
   const [monedaReembolso, setMonedaReembolso] = useState("USD");
+  const [direccionEfectivo, setDireccionEfectivo] = useState("egreso");
+  const [montoManual, setMontoManual] = useState("");
+  const [montoTocado, setMontoTocado] = useState(false);
   const [metodoPagoId, setMetodoPagoId] = useState("");
   const [motivo, setMotivo] = useState("");
   const [guardando, setGuardando] = useState(false);
 
-  // Solo se usa cuando la venta original NO tenía cliente y se elige "credito"
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [resultadosCliente, setResultadosCliente] = useState([]);
   const [clienteCredito, setClienteCredito] = useState(null);
@@ -72,6 +74,12 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
 
   const monedaOriginal = items[0]?.moneda_original;
 
+  // El monto se autocompleta con lo calculado desde los productos elegidos, pero se puede
+  // ajustar a mano — por ejemplo cuando es un cambio y la diferencia no coincide exacto.
+  useEffect(() => {
+    if (!montoTocado) setMontoManual(montoEstimado > 0 ? montoEstimado.toFixed(2) : "");
+  }, [montoEstimado, montoTocado]);
+
   const manejarSubmit = async (e) => {
     e.preventDefault();
     if (itemsSeleccionados.length === 0) {
@@ -79,7 +87,7 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
       return;
     }
     if (tipoReembolso === "efectivo" && !metodoPagoId) {
-      toast.error("Indicá con qué método se le devolvió el dinero");
+      toast.error("Indicá con qué método se movió el dinero");
       return;
     }
     if (tipoReembolso === "credito" && !ventaTieneCliente && !clienteCredito) {
@@ -94,6 +102,8 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
         items: itemsSeleccionados.map((i) => ({ producto_id: i.producto_id, cantidad: cantidades[i.producto_id] })),
         tipo_reembolso: tipoReembolso,
         moneda_reembolso: tipoReembolso !== "ninguno" ? monedaReembolso : null,
+        monto_manual: tipoReembolso !== "ninguno" ? montoManual : undefined,
+        direccion_efectivo: tipoReembolso === "efectivo" ? direccionEfectivo : undefined,
         metodo_pago_id: tipoReembolso === "efectivo" ? Number(metodoPagoId) : null,
         cliente_id: tipoReembolso === "credito" && !ventaTieneCliente ? clienteCredito?.id : undefined,
         motivo: motivo || null,
@@ -157,7 +167,7 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
           {itemsSeleccionados.length > 0 && (
             <div className="carrito-resumen mt-1">
               <div className="carrito-resumen-total">
-                <span>Valor a devolver</span>
+                <span>Valor de lista de lo elegido</span>
                 <span>{formatearMoneda(montoEstimado, monedaOriginal)}</span>
               </div>
             </div>
@@ -169,7 +179,7 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
               Solo cambio
             </button>
             <button type="button" className={tipoReembolso === "efectivo" ? "activo" : ""} onClick={() => setTipoReembolso("efectivo")}>
-              Reembolsar efectivo
+              Mover efectivo
             </button>
             {hayFiado && (
               <button type="button" className={tipoReembolso === "fiado" ? "activo" : ""} onClick={() => setTipoReembolso("fiado")}>
@@ -219,8 +229,28 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
             </div>
           )}
 
+          {tipoReembolso === "efectivo" && (
+            <div className="selector-pill mt-1">
+              <button type="button" className={direccionEfectivo === "egreso" ? "activo" : ""} onClick={() => setDireccionEfectivo("egreso")}>
+                Devolvemos plata (sale de caja)
+              </button>
+              <button type="button" className={direccionEfectivo === "ingreso" ? "activo" : ""} onClick={() => setDireccionEfectivo("ingreso")}>
+                Cliente paga diferencia (entra a caja)
+              </button>
+            </div>
+          )}
+
           {tipoReembolso !== "ninguno" && (
             <div className="formulario-fila mt-1">
+              <div className="formulario-campo">
+                <label>Monto a mover</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={montoManual}
+                  onChange={(e) => { setMontoTocado(true); setMontoManual(e.target.value); }}
+                />
+              </div>
               <div className="formulario-campo" style={{ flex: "0 0 90px" }}>
                 <label>Moneda</label>
                 <select value={monedaReembolso} onChange={(e) => setMonedaReembolso(e.target.value)}>
@@ -241,7 +271,9 @@ export default function DevolucionFormModal({ ventaId, metodosPago, onGuardado, 
 
           {tipoReembolso === "efectivo" && (
             <p className="pagina-subtitulo mt-1">
-              Esto se registra como un egreso del turno actual — se refleja en Punto de Venta y resta del cuadre de caja.
+              {direccionEfectivo === "egreso"
+                ? "Se registra como egreso del turno actual — resta del cuadre de caja."
+                : "Se registra como ingreso del turno actual — suma al cuadre de caja."}
             </p>
           )}
           {tipoReembolso === "fiado" && (
